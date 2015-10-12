@@ -634,14 +634,17 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 							if(_pasteHandler) text = _pasteHandler(scope, {$html: text}) || text;
 
 							text = taSanitize(text, '', _disableSanitizer);
+							var result = taSelection.insertHtml(text, element[0]);
 
-							taSelection.insertHtml(text, element[0]);
+							scope.$emit('pastedImages', result.imageUrls);
+
 							$timeout(function(){
 								ngModel.$setViewValue(_compileHtml());
 								_processingPaste = false;
 								element.removeClass('processing-paste');
 							}, 0);
-						}else{
+						}
+						else{
 							_processingPaste = false;
 							element.removeClass('processing-paste');
 						}

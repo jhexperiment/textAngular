@@ -229,215 +229,275 @@ angular.module('textAngular.DOM', ['textAngular.factories'])
 			}catch(e){}
 		};
 	};
-}]).service('taSelection', ['$window', '$document', 'taDOM',
-/* istanbul ignore next: all browser specifics and PhantomJS dosen't seem to support half of it */
-function($window, $document, taDOM){
-	// need to dereference the document else the calls don't work correctly
-	var _document = $document[0];
-	var rangy = $window.rangy;
-	var brException = function (element, offset) {
-		/* check if selection is a BR element at the beginning of a container. If so, get
-		* the parentNode instead.
-		* offset should be zero in this case. Otherwise, return the original
-		* element.
-		*/
-		if (element.tagName && element.tagName.match(/^br$/i) && offset === 0 && !element.previousSibling) {
-            return {
-                element: element.parentNode,
-                offset: 0
-            };
-		} else {
-			return {
-				element: element,
-				offset: offset
-			};
-		}
-	};
-	var api = {
-		getSelection: function(){
-			var range = rangy.getSelection().getRangeAt(0);
-			var container = range.commonAncestorContainer;
-			var selection = {
-				start: brException(range.startContainer, range.startOffset),
-				end: brException(range.endContainer, range.endOffset),
-				collapsed: range.collapsed
-			};
-			// Check if the container is a text node and return its parent if so
-			container = container.nodeType === 3 ? container.parentNode : container;
-			if (container.parentNode === selection.start.element ||
-				container.parentNode === selection.end.element) {
-				selection.container = container.parentNode;
+}])
+.service('taSelection', ['$sanitize', '$window', '$document', 'taDOM',
+	/* istanbul ignore next: all browser specifics and PhantomJS dosen't seem to support half of it */
+	function($sanitize, $window, $document, taDOM){
+		// need to dereference the document else the calls don't work correctly
+		var _document = $document[0];
+		var rangy = $window.rangy;
+		var brException = function (element, offset) {
+			/* check if selection is a BR element at the beginning of a container. If so, get
+			* the parentNode instead.
+			* offset should be zero in this case. Otherwise, return the original
+			* element.
+			*/
+			if (element.tagName && element.tagName.match(/^br$/i) && offset === 0 && !element.previousSibling) {
+							return {
+									element: element.parentNode,
+									offset: 0
+							};
 			} else {
-				selection.container = container;
+				return {
+					element: element,
+					offset: offset
+				};
 			}
-			return selection;
-		},
-		getOnlySelectedElements: function(){
-			var range = rangy.getSelection().getRangeAt(0);
-			var container = range.commonAncestorContainer;
-			// Check if the container is a text node and return its parent if so
-			container = container.nodeType === 3 ? container.parentNode : container;
-			return range.getNodes([1], function(node){
-				return node.parentNode === container;
-			});
-		},
-		// Some basic selection functions
-		getSelectionElement: function () {
-			return api.getSelection().container;
-		},
-		setSelection: function(el, start, end){
-			var range = rangy.createRange();
-			
-			range.setStart(el, start);
-			range.setEnd(el, end);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionBeforeElement: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNode(el);
-			range.collapse(true);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionAfterElement: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNode(el);
-			range.collapse(false);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionToElementStart: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNodeContents(el);
-			range.collapse(true);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionToElementEnd: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNodeContents(el);
-			range.collapse(false);
-			if(el.childNodes && el.childNodes[el.childNodes.length - 1] && el.childNodes[el.childNodes.length - 1].nodeName === 'br'){
-				range.startOffset = range.endOffset = range.startOffset - 1;
-			}
-			rangy.getSelection().setSingleRange(range);
-		},
-		// from http://stackoverflow.com/questions/6690752/insert-html-at-caret-in-a-contenteditable-div
-		// topNode is the contenteditable normally, all manipulation MUST be inside this.
-		insertHtml: function(html, topNode){
-			var parent, secondParent, _childI, nodes, i, lastNode, _tempFrag;
-			var element = angular.element("<div>" + html + "</div>");
-			var range = rangy.getSelection().getRangeAt(0);
-			var frag = _document.createDocumentFragment();
-			var children = element[0].childNodes;
-			var isInline = true;
-			
-			if(children.length > 0){
-				// NOTE!! We need to do the following:
-				// check for blockelements - if they exist then we have to split the current element in half (and all others up to the closest block element) and insert all children in-between.
-				// If there are no block elements, or there is a mixture we need to create textNodes for the non wrapped text (we don't want them spans messing up the picture).
-				nodes = [];
-				for(_childI = 0; _childI < children.length; _childI++){
-					if(!(
-						(children[_childI].nodeName.toLowerCase() === 'p' && children[_childI].innerHTML.trim() === '') || // empty p element
-						(children[_childI].nodeType === 3 && children[_childI].nodeValue.trim() === '') // empty text node
-					)){
-						isInline = isInline && !BLOCKELEMENTS.test(children[_childI].nodeName);
-						nodes.push(children[_childI]);
+		};
+		var api = {
+			getSelection: function(){
+				var range = rangy.getSelection().getRangeAt(0);
+				var container = range.commonAncestorContainer;
+				var selection = {
+					start: brException(range.startContainer, range.startOffset),
+					end: brException(range.endContainer, range.endOffset),
+					collapsed: range.collapsed
+				};
+				// Check if the container is a text node and return its parent if so
+				container = container.nodeType === 3 ? container.parentNode : container;
+				if (container.parentNode === selection.start.element ||
+					container.parentNode === selection.end.element) {
+					selection.container = container.parentNode;
+				} else {
+					selection.container = container;
+				}
+				return selection;
+			},
+			getOnlySelectedElements: function(){
+				var range = rangy.getSelection().getRangeAt(0);
+				var container = range.commonAncestorContainer;
+				// Check if the container is a text node and return its parent if so
+				container = container.nodeType === 3 ? container.parentNode : container;
+				return range.getNodes([1], function(node){
+					return node.parentNode === container;
+				});
+			},
+			// Some basic selection functions
+			getSelectionElement: function () {
+				return api.getSelection().container;
+			},
+			setSelection: function(el, start, end){
+				var range = rangy.createRange();
+
+				range.setStart(el, start);
+				range.setEnd(el, end);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionBeforeElement: function (el){
+				var range = rangy.createRange();
+
+				range.selectNode(el);
+				range.collapse(true);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionAfterElement: function (el){
+				var range = rangy.createRange();
+
+				range.selectNode(el);
+				range.collapse(false);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionToElementStart: function (el){
+				var range = rangy.createRange();
+
+				range.selectNodeContents(el);
+				range.collapse(true);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionToElementEnd: function (el){
+				var range = rangy.createRange();
+
+				range.selectNodeContents(el);
+				range.collapse(false);
+				if(el.childNodes && el.childNodes[el.childNodes.length - 1] && el.childNodes[el.childNodes.length - 1].nodeName === 'br'){
+					range.startOffset = range.endOffset = range.startOffset - 1;
+				}
+				rangy.getSelection().setSingleRange(range);
+			},
+			// from http://stackoverflow.com/questions/6690752/insert-html-at-caret-in-a-contenteditable-div
+			// topNode is the contenteditable normally, all manipulation MUST be inside this.
+			insertHtml: function(html, topNode){
+
+				html = $sanitize(html);
+
+				var match;
+				var imageUrls = [];
+				var re = /<img.*?src="(.*?)"[^>]+\>/gi;
+				while (match = re.exec(html)) {
+					imageUrls.push(match[1]);
+				}
+
+				html = html.replace(/<img[^>]+\>/gi, '');
+				html = html.replace(/<input[^>]+\>/gi, '');
+
+				html = html.replace(/(style|id|class)=".*?"/gi, '');
+
+				var parent, secondParent, _childI, nodes, i, lastNode, _tempFrag;
+				var element = angular.element("<div>" + html + "</div>");
+				var range = rangy.getSelection().getRangeAt(0);
+				var frag = _document.createDocumentFragment();
+				var children = element[0].childNodes;
+				var isInline = true;
+
+				if(children.length > 0){
+					// NOTE!! We need to do the following:
+					// check for blockelements - if they exist then we have to split the current element in half (and all others up to the closest block element) and insert all children in-between.
+					// If there are no block elements, or there is a mixture we need to create textNodes for the non wrapped text (we don't want them spans messing up the picture).
+					nodes = [];
+
+					for (_childI = 0; _childI < children.length; _childI++) {
+						// clear all styles
+						children[_childI].removeAttribute('style');
+						children[_childI].removeAttribute('id');
+						children[_childI].removeAttribute('class');
+
+						if(
+							! (
+								(
+									// empty p element
+									children[_childI].nodeName.toLowerCase() === 'p' && children[_childI].innerHTML.trim() === ''
+								)
+								|| (
+									// empty text node
+									children[_childI].nodeType === 3 && children[_childI].nodeValue.trim() === ''
+								)
+							)
+						) {
+
+							isInline = isInline && !BLOCKELEMENTS.test(children[_childI].nodeName);
+
+							nodes.push(children[_childI]);
+						}
+					}
+
+					for (var _n = 0; _n < nodes.length; _n++) {
+						lastNode = frag.appendChild(nodes[_n]);
+					}
+					if (
+						! isInline
+						&& range.collapsed
+						&& /^(|<br(|\/)>)$/i.test(range.startContainer.innerHTML)
+					) {
+						range.selectNode(range.startContainer);
 					}
 				}
-				for(var _n = 0; _n < nodes.length; _n++) lastNode = frag.appendChild(nodes[_n]);
-				if(!isInline && range.collapsed && /^(|<br(|\/)>)$/i.test(range.startContainer.innerHTML)) range.selectNode(range.startContainer);
-			}else{
-				isInline = true;
-				// paste text of some sort
-				lastNode = frag = _document.createTextNode(html);
-			}
-			
-			// Other Edge case - selected data spans multiple blocks.
-			if(isInline){
-				range.deleteContents();
-			}else{ // not inline insert
-				if(range.collapsed && range.startContainer !== topNode){
-					if(range.startContainer.innerHTML && range.startContainer.innerHTML.match(/^<[^>]*>$/i)){
-						// this log is to catch when innerHTML is something like `<img ...>`
-						parent = range.startContainer;
-						if(range.startOffset === 1){
-							// before single tag
-							range.setStartAfter(parent);
-							range.setEndAfter(parent);
-						}else{
-							// after single tag
-							range.setStartBefore(parent);
-							range.setEndBefore(parent);
-						}
-					}else{
-						// split element into 2 and insert block element in middle
-						if(range.startContainer.nodeType === 3 && range.startContainer.parentNode !== topNode){ // if text node
-							parent = range.startContainer.parentNode;
-							secondParent = parent.cloneNode();
-							// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
-							taDOM.splitNodes(parent.childNodes, parent, secondParent, range.startContainer, range.startOffset);
-							
-							// Escape out of the inline tags like b
-							while(!VALIDELEMENTS.test(parent.nodeName)){
-								angular.element(parent).after(secondParent);
-								parent = parent.parentNode;
-								var _lastSecondParent = secondParent;
-								secondParent = parent.cloneNode();
-								// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
-								taDOM.splitNodes(parent.childNodes, parent, secondParent, _lastSecondParent);
-							}
-						}else{
-							parent = range.startContainer;
-							secondParent = parent.cloneNode();
-							taDOM.splitNodes(parent.childNodes, parent, secondParent, undefined, undefined, range.startOffset);
-						}
-						
-						angular.element(parent).after(secondParent);
-						// put cursor to end of inserted content
-						range.setStartAfter(parent);
-						range.setEndAfter(parent);
-						
-						if(/^(|<br(|\/)>)$/i.test(parent.innerHTML.trim())){
-							range.setStartBefore(parent);
-							range.setEndBefore(parent);
-							angular.element(parent).remove();
-						}
-						if(/^(|<br(|\/)>)$/i.test(secondParent.innerHTML.trim())) angular.element(secondParent).remove();
-						if(parent.nodeName.toLowerCase() === 'li'){
-							_tempFrag = _document.createDocumentFragment();
-							for(i = 0; i < frag.childNodes.length; i++){
-								element = angular.element('<li>');
-								taDOM.transferChildNodes(frag.childNodes[i], element[0]);
-								taDOM.transferNodeAttributes(frag.childNodes[i], element[0]);
-								_tempFrag.appendChild(element[0]);
-							}
-							frag = _tempFrag;
-							if(lastNode){
-								lastNode = frag.childNodes[frag.childNodes.length - 1];
-								lastNode = lastNode.childNodes[lastNode.childNodes.length - 1];
-							}
-						}
-					}
-				}else{
+				else{
+					isInline = true;
+					// paste text of some sort
+					lastNode = frag = _document.createTextNode($sanitize(html));
+				}
+
+				// Other Edge case - selected data spans multiple blocks.
+				if (isInline) {
 					range.deleteContents();
 				}
+				else { // not inline insert
+					if (range.collapsed && range.startContainer !== topNode) {
+						if (range.startContainer.innerHTML && range.startContainer.innerHTML.match(/^<[^>]*>$/i)){
+							// this log is to catch when innerHTML is something like `<img ...>`
+							parent = range.startContainer;
+							if(range.startOffset === 1) {
+								// before single tag
+								range.setStartAfter(parent);
+								range.setEndAfter(parent);
+							}
+							else{
+								// after single tag
+								range.setStartBefore(parent);
+								range.setEndBefore(parent);
+							}
+						}
+						else{
+							// split element into 2 and insert block element in middle
+							if(range.startContainer.nodeType === 3 && range.startContainer.parentNode !== topNode){ // if text node
+								parent = range.startContainer.parentNode;
+								secondParent = parent.cloneNode();
+								// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
+								taDOM.splitNodes(parent.childNodes, parent, secondParent, range.startContainer, range.startOffset);
+
+								// Escape out of the inline tags like b
+								while(!VALIDELEMENTS.test(parent.nodeName)){
+									angular.element(parent).after(secondParent);
+									parent = parent.parentNode;
+									var _lastSecondParent = secondParent;
+									secondParent = parent.cloneNode();
+									// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
+									taDOM.splitNodes(parent.childNodes, parent, secondParent, _lastSecondParent);
+								}
+							}
+							else{
+								parent = range.startContainer;
+								secondParent = parent.cloneNode();
+								taDOM.splitNodes(parent.childNodes, parent, secondParent, undefined, undefined, range.startOffset);
+							}
+
+							angular.element(parent).after(secondParent);
+							// put cursor to end of inserted content
+							range.setStartAfter(parent);
+							range.setEndAfter(parent);
+
+							if(/^(|<br(|\/)>)$/i.test(parent.innerHTML.trim())){
+								range.setStartBefore(parent);
+								range.setEndBefore(parent);
+								angular.element(parent).remove();
+							}
+							if(/^(|<br(|\/)>)$/i.test(secondParent.innerHTML.trim())) angular.element(secondParent).remove();
+							if (parent.nodeName.toLowerCase() === 'li') {
+
+								_tempFrag = _document.createDocumentFragment();
+
+								for(i = 0; i < frag.childNodes.length; i++){
+
+									element = angular.element('<li>');
+									taDOM.transferChildNodes(frag.childNodes[i], element[0]);
+									taDOM.transferNodeAttributes(frag.childNodes[i], element[0]);
+									_tempFrag.appendChild(element[0]);
+
+								}
+
+								frag = _tempFrag;
+
+								if(lastNode){
+									lastNode = frag.childNodes[frag.childNodes.length - 1];
+									lastNode = lastNode.childNodes[lastNode.childNodes.length - 1];
+								}
+							}
+						}
+					}
+					else {
+						range.deleteContents();
+					}
+				}
+
+				range.insertNode(frag);
+				if(lastNode){
+					api.setSelectionToElementEnd(lastNode);
+				}
+
+
+				return {
+					imageUrls: imageUrls
+				}
 			}
-			
-			range.insertNode(frag);
-			if(lastNode){
-				api.setSelectionToElementEnd(lastNode);
-			}
-		}
-	};
-	return api;
-}]).service('taDOM', function(){
+		};
+		return api;
+	}]
+)
+.service('taDOM', function(){
 	var taDOM = {
 		// recursive function that returns an array of angular.elements that have the passed attribute set on them
 		getByAttribute: function(element, attribute){

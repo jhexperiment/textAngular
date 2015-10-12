@@ -662,215 +662,275 @@ angular.module('textAngular.DOM', ['textAngular.factories'])
 			}catch(e){}
 		};
 	};
-}]).service('taSelection', ['$window', '$document', 'taDOM',
-/* istanbul ignore next: all browser specifics and PhantomJS dosen't seem to support half of it */
-function($window, $document, taDOM){
-	// need to dereference the document else the calls don't work correctly
-	var _document = $document[0];
-	var rangy = $window.rangy;
-	var brException = function (element, offset) {
-		/* check if selection is a BR element at the beginning of a container. If so, get
-		* the parentNode instead.
-		* offset should be zero in this case. Otherwise, return the original
-		* element.
-		*/
-		if (element.tagName && element.tagName.match(/^br$/i) && offset === 0 && !element.previousSibling) {
-            return {
-                element: element.parentNode,
-                offset: 0
-            };
-		} else {
-			return {
-				element: element,
-				offset: offset
-			};
-		}
-	};
-	var api = {
-		getSelection: function(){
-			var range = rangy.getSelection().getRangeAt(0);
-			var container = range.commonAncestorContainer;
-			var selection = {
-				start: brException(range.startContainer, range.startOffset),
-				end: brException(range.endContainer, range.endOffset),
-				collapsed: range.collapsed
-			};
-			// Check if the container is a text node and return its parent if so
-			container = container.nodeType === 3 ? container.parentNode : container;
-			if (container.parentNode === selection.start.element ||
-				container.parentNode === selection.end.element) {
-				selection.container = container.parentNode;
+}])
+.service('taSelection', ['$sanitize', '$window', '$document', 'taDOM',
+	/* istanbul ignore next: all browser specifics and PhantomJS dosen't seem to support half of it */
+	function($sanitize, $window, $document, taDOM){
+		// need to dereference the document else the calls don't work correctly
+		var _document = $document[0];
+		var rangy = $window.rangy;
+		var brException = function (element, offset) {
+			/* check if selection is a BR element at the beginning of a container. If so, get
+			* the parentNode instead.
+			* offset should be zero in this case. Otherwise, return the original
+			* element.
+			*/
+			if (element.tagName && element.tagName.match(/^br$/i) && offset === 0 && !element.previousSibling) {
+							return {
+									element: element.parentNode,
+									offset: 0
+							};
 			} else {
-				selection.container = container;
+				return {
+					element: element,
+					offset: offset
+				};
 			}
-			return selection;
-		},
-		getOnlySelectedElements: function(){
-			var range = rangy.getSelection().getRangeAt(0);
-			var container = range.commonAncestorContainer;
-			// Check if the container is a text node and return its parent if so
-			container = container.nodeType === 3 ? container.parentNode : container;
-			return range.getNodes([1], function(node){
-				return node.parentNode === container;
-			});
-		},
-		// Some basic selection functions
-		getSelectionElement: function () {
-			return api.getSelection().container;
-		},
-		setSelection: function(el, start, end){
-			var range = rangy.createRange();
-			
-			range.setStart(el, start);
-			range.setEnd(el, end);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionBeforeElement: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNode(el);
-			range.collapse(true);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionAfterElement: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNode(el);
-			range.collapse(false);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionToElementStart: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNodeContents(el);
-			range.collapse(true);
-			
-			rangy.getSelection().setSingleRange(range);
-		},
-		setSelectionToElementEnd: function (el){
-			var range = rangy.createRange();
-			
-			range.selectNodeContents(el);
-			range.collapse(false);
-			if(el.childNodes && el.childNodes[el.childNodes.length - 1] && el.childNodes[el.childNodes.length - 1].nodeName === 'br'){
-				range.startOffset = range.endOffset = range.startOffset - 1;
-			}
-			rangy.getSelection().setSingleRange(range);
-		},
-		// from http://stackoverflow.com/questions/6690752/insert-html-at-caret-in-a-contenteditable-div
-		// topNode is the contenteditable normally, all manipulation MUST be inside this.
-		insertHtml: function(html, topNode){
-			var parent, secondParent, _childI, nodes, i, lastNode, _tempFrag;
-			var element = angular.element("<div>" + html + "</div>");
-			var range = rangy.getSelection().getRangeAt(0);
-			var frag = _document.createDocumentFragment();
-			var children = element[0].childNodes;
-			var isInline = true;
-			
-			if(children.length > 0){
-				// NOTE!! We need to do the following:
-				// check for blockelements - if they exist then we have to split the current element in half (and all others up to the closest block element) and insert all children in-between.
-				// If there are no block elements, or there is a mixture we need to create textNodes for the non wrapped text (we don't want them spans messing up the picture).
-				nodes = [];
-				for(_childI = 0; _childI < children.length; _childI++){
-					if(!(
-						(children[_childI].nodeName.toLowerCase() === 'p' && children[_childI].innerHTML.trim() === '') || // empty p element
-						(children[_childI].nodeType === 3 && children[_childI].nodeValue.trim() === '') // empty text node
-					)){
-						isInline = isInline && !BLOCKELEMENTS.test(children[_childI].nodeName);
-						nodes.push(children[_childI]);
+		};
+		var api = {
+			getSelection: function(){
+				var range = rangy.getSelection().getRangeAt(0);
+				var container = range.commonAncestorContainer;
+				var selection = {
+					start: brException(range.startContainer, range.startOffset),
+					end: brException(range.endContainer, range.endOffset),
+					collapsed: range.collapsed
+				};
+				// Check if the container is a text node and return its parent if so
+				container = container.nodeType === 3 ? container.parentNode : container;
+				if (container.parentNode === selection.start.element ||
+					container.parentNode === selection.end.element) {
+					selection.container = container.parentNode;
+				} else {
+					selection.container = container;
+				}
+				return selection;
+			},
+			getOnlySelectedElements: function(){
+				var range = rangy.getSelection().getRangeAt(0);
+				var container = range.commonAncestorContainer;
+				// Check if the container is a text node and return its parent if so
+				container = container.nodeType === 3 ? container.parentNode : container;
+				return range.getNodes([1], function(node){
+					return node.parentNode === container;
+				});
+			},
+			// Some basic selection functions
+			getSelectionElement: function () {
+				return api.getSelection().container;
+			},
+			setSelection: function(el, start, end){
+				var range = rangy.createRange();
+
+				range.setStart(el, start);
+				range.setEnd(el, end);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionBeforeElement: function (el){
+				var range = rangy.createRange();
+
+				range.selectNode(el);
+				range.collapse(true);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionAfterElement: function (el){
+				var range = rangy.createRange();
+
+				range.selectNode(el);
+				range.collapse(false);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionToElementStart: function (el){
+				var range = rangy.createRange();
+
+				range.selectNodeContents(el);
+				range.collapse(true);
+
+				rangy.getSelection().setSingleRange(range);
+			},
+			setSelectionToElementEnd: function (el){
+				var range = rangy.createRange();
+
+				range.selectNodeContents(el);
+				range.collapse(false);
+				if(el.childNodes && el.childNodes[el.childNodes.length - 1] && el.childNodes[el.childNodes.length - 1].nodeName === 'br'){
+					range.startOffset = range.endOffset = range.startOffset - 1;
+				}
+				rangy.getSelection().setSingleRange(range);
+			},
+			// from http://stackoverflow.com/questions/6690752/insert-html-at-caret-in-a-contenteditable-div
+			// topNode is the contenteditable normally, all manipulation MUST be inside this.
+			insertHtml: function(html, topNode){
+
+				html = $sanitize(html);
+
+				var match;
+				var imageUrls = [];
+				var re = /<img.*?src="(.*?)"[^>]+\>/gi;
+				while (match = re.exec(html)) {
+					imageUrls.push(match[1]);
+				}
+
+				html = html.replace(/<img[^>]+\>/gi, '');
+				html = html.replace(/<input[^>]+\>/gi, '');
+
+				html = html.replace(/(style|id|class)=".*?"/gi, '');
+
+				var parent, secondParent, _childI, nodes, i, lastNode, _tempFrag;
+				var element = angular.element("<div>" + html + "</div>");
+				var range = rangy.getSelection().getRangeAt(0);
+				var frag = _document.createDocumentFragment();
+				var children = element[0].childNodes;
+				var isInline = true;
+
+				if(children.length > 0){
+					// NOTE!! We need to do the following:
+					// check for blockelements - if they exist then we have to split the current element in half (and all others up to the closest block element) and insert all children in-between.
+					// If there are no block elements, or there is a mixture we need to create textNodes for the non wrapped text (we don't want them spans messing up the picture).
+					nodes = [];
+
+					for (_childI = 0; _childI < children.length; _childI++) {
+						// clear all styles
+						children[_childI].removeAttribute('style');
+						children[_childI].removeAttribute('id');
+						children[_childI].removeAttribute('class');
+
+						if(
+							! (
+								(
+									// empty p element
+									children[_childI].nodeName.toLowerCase() === 'p' && children[_childI].innerHTML.trim() === ''
+								)
+								|| (
+									// empty text node
+									children[_childI].nodeType === 3 && children[_childI].nodeValue.trim() === ''
+								)
+							)
+						) {
+
+							isInline = isInline && !BLOCKELEMENTS.test(children[_childI].nodeName);
+
+							nodes.push(children[_childI]);
+						}
+					}
+
+					for (var _n = 0; _n < nodes.length; _n++) {
+						lastNode = frag.appendChild(nodes[_n]);
+					}
+					if (
+						! isInline
+						&& range.collapsed
+						&& /^(|<br(|\/)>)$/i.test(range.startContainer.innerHTML)
+					) {
+						range.selectNode(range.startContainer);
 					}
 				}
-				for(var _n = 0; _n < nodes.length; _n++) lastNode = frag.appendChild(nodes[_n]);
-				if(!isInline && range.collapsed && /^(|<br(|\/)>)$/i.test(range.startContainer.innerHTML)) range.selectNode(range.startContainer);
-			}else{
-				isInline = true;
-				// paste text of some sort
-				lastNode = frag = _document.createTextNode(html);
-			}
-			
-			// Other Edge case - selected data spans multiple blocks.
-			if(isInline){
-				range.deleteContents();
-			}else{ // not inline insert
-				if(range.collapsed && range.startContainer !== topNode){
-					if(range.startContainer.innerHTML && range.startContainer.innerHTML.match(/^<[^>]*>$/i)){
-						// this log is to catch when innerHTML is something like `<img ...>`
-						parent = range.startContainer;
-						if(range.startOffset === 1){
-							// before single tag
-							range.setStartAfter(parent);
-							range.setEndAfter(parent);
-						}else{
-							// after single tag
-							range.setStartBefore(parent);
-							range.setEndBefore(parent);
-						}
-					}else{
-						// split element into 2 and insert block element in middle
-						if(range.startContainer.nodeType === 3 && range.startContainer.parentNode !== topNode){ // if text node
-							parent = range.startContainer.parentNode;
-							secondParent = parent.cloneNode();
-							// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
-							taDOM.splitNodes(parent.childNodes, parent, secondParent, range.startContainer, range.startOffset);
-							
-							// Escape out of the inline tags like b
-							while(!VALIDELEMENTS.test(parent.nodeName)){
-								angular.element(parent).after(secondParent);
-								parent = parent.parentNode;
-								var _lastSecondParent = secondParent;
-								secondParent = parent.cloneNode();
-								// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
-								taDOM.splitNodes(parent.childNodes, parent, secondParent, _lastSecondParent);
-							}
-						}else{
-							parent = range.startContainer;
-							secondParent = parent.cloneNode();
-							taDOM.splitNodes(parent.childNodes, parent, secondParent, undefined, undefined, range.startOffset);
-						}
-						
-						angular.element(parent).after(secondParent);
-						// put cursor to end of inserted content
-						range.setStartAfter(parent);
-						range.setEndAfter(parent);
-						
-						if(/^(|<br(|\/)>)$/i.test(parent.innerHTML.trim())){
-							range.setStartBefore(parent);
-							range.setEndBefore(parent);
-							angular.element(parent).remove();
-						}
-						if(/^(|<br(|\/)>)$/i.test(secondParent.innerHTML.trim())) angular.element(secondParent).remove();
-						if(parent.nodeName.toLowerCase() === 'li'){
-							_tempFrag = _document.createDocumentFragment();
-							for(i = 0; i < frag.childNodes.length; i++){
-								element = angular.element('<li>');
-								taDOM.transferChildNodes(frag.childNodes[i], element[0]);
-								taDOM.transferNodeAttributes(frag.childNodes[i], element[0]);
-								_tempFrag.appendChild(element[0]);
-							}
-							frag = _tempFrag;
-							if(lastNode){
-								lastNode = frag.childNodes[frag.childNodes.length - 1];
-								lastNode = lastNode.childNodes[lastNode.childNodes.length - 1];
-							}
-						}
-					}
-				}else{
+				else{
+					isInline = true;
+					// paste text of some sort
+					lastNode = frag = _document.createTextNode($sanitize(html));
+				}
+
+				// Other Edge case - selected data spans multiple blocks.
+				if (isInline) {
 					range.deleteContents();
 				}
+				else { // not inline insert
+					if (range.collapsed && range.startContainer !== topNode) {
+						if (range.startContainer.innerHTML && range.startContainer.innerHTML.match(/^<[^>]*>$/i)){
+							// this log is to catch when innerHTML is something like `<img ...>`
+							parent = range.startContainer;
+							if(range.startOffset === 1) {
+								// before single tag
+								range.setStartAfter(parent);
+								range.setEndAfter(parent);
+							}
+							else{
+								// after single tag
+								range.setStartBefore(parent);
+								range.setEndBefore(parent);
+							}
+						}
+						else{
+							// split element into 2 and insert block element in middle
+							if(range.startContainer.nodeType === 3 && range.startContainer.parentNode !== topNode){ // if text node
+								parent = range.startContainer.parentNode;
+								secondParent = parent.cloneNode();
+								// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
+								taDOM.splitNodes(parent.childNodes, parent, secondParent, range.startContainer, range.startOffset);
+
+								// Escape out of the inline tags like b
+								while(!VALIDELEMENTS.test(parent.nodeName)){
+									angular.element(parent).after(secondParent);
+									parent = parent.parentNode;
+									var _lastSecondParent = secondParent;
+									secondParent = parent.cloneNode();
+									// split the nodes into two lists - before and after, splitting the node with the selection into 2 text nodes.
+									taDOM.splitNodes(parent.childNodes, parent, secondParent, _lastSecondParent);
+								}
+							}
+							else{
+								parent = range.startContainer;
+								secondParent = parent.cloneNode();
+								taDOM.splitNodes(parent.childNodes, parent, secondParent, undefined, undefined, range.startOffset);
+							}
+
+							angular.element(parent).after(secondParent);
+							// put cursor to end of inserted content
+							range.setStartAfter(parent);
+							range.setEndAfter(parent);
+
+							if(/^(|<br(|\/)>)$/i.test(parent.innerHTML.trim())){
+								range.setStartBefore(parent);
+								range.setEndBefore(parent);
+								angular.element(parent).remove();
+							}
+							if(/^(|<br(|\/)>)$/i.test(secondParent.innerHTML.trim())) angular.element(secondParent).remove();
+							if (parent.nodeName.toLowerCase() === 'li') {
+
+								_tempFrag = _document.createDocumentFragment();
+
+								for(i = 0; i < frag.childNodes.length; i++){
+
+									element = angular.element('<li>');
+									taDOM.transferChildNodes(frag.childNodes[i], element[0]);
+									taDOM.transferNodeAttributes(frag.childNodes[i], element[0]);
+									_tempFrag.appendChild(element[0]);
+
+								}
+
+								frag = _tempFrag;
+
+								if(lastNode){
+									lastNode = frag.childNodes[frag.childNodes.length - 1];
+									lastNode = lastNode.childNodes[lastNode.childNodes.length - 1];
+								}
+							}
+						}
+					}
+					else {
+						range.deleteContents();
+					}
+				}
+
+				range.insertNode(frag);
+				if(lastNode){
+					api.setSelectionToElementEnd(lastNode);
+				}
+
+
+				return {
+					imageUrls: imageUrls
+				}
 			}
-			
-			range.insertNode(frag);
-			if(lastNode){
-				api.setSelectionToElementEnd(lastNode);
-			}
-		}
-	};
-	return api;
-}]).service('taDOM', function(){
+		};
+		return api;
+	}]
+)
+.service('taDOM', function(){
 	var taDOM = {
 		// recursive function that returns an array of angular.elements that have the passed attribute set on them
 		getByAttribute: function(element, attribute){
@@ -1608,14 +1668,17 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 							if(_pasteHandler) text = _pasteHandler(scope, {$html: text}) || text;
 
 							text = taSanitize(text, '', _disableSanitizer);
+							var result = taSelection.insertHtml(text, element[0]);
 
-							taSelection.insertHtml(text, element[0]);
+							scope.$emit('pastedImages', result.imageUrls);
+
 							$timeout(function(){
 								ngModel.$setViewValue(_compileHtml());
 								_processingPaste = false;
 								element.removeClass('processing-paste');
 							}, 0);
-						}else{
+						}
+						else{
 							_processingPaste = false;
 							element.removeClass('processing-paste');
 						}
@@ -1718,25 +1781,39 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 							}
 							/* istanbul ignore next: difficult to test as can't seem to select */
 							if(event.keyCode === 13 && !event.shiftKey){
+								var contains = function(a, obj) {
+									for (var i = 0; i < a.length; i++) {
+										if (a[i] === obj) {
+											return true;
+										}
+									}
+									return false;
+								};
 								var $selection;
 								var selection = taSelection.getSelectionElement();
 								if(!selection.tagName.match(VALIDELEMENTS)) return;
 								var _new = angular.element(_defaultVal);
-								if (/^<br(|\/)>$/i.test(selection.innerHTML.trim()) && selection.parentNode.tagName.toLowerCase() === 'blockquote' && !selection.nextSibling) {
-									// if last element in blockquote and element is blank, pull element outside of blockquote.
-									$selection = angular.element(selection);
-									var _parent = $selection.parent();
-									_parent.after(_new);
-									$selection.remove();
-									if(_parent.children().length === 0) _parent.remove();
-									taSelection.setSelectionToElementStart(_new[0]);
-									event.preventDefault();
-								}else if (/^<[^>]+><br(|\/)><\/[^>]+>$/i.test(selection.innerHTML.trim()) && selection.tagName.toLowerCase() === 'blockquote'){
-									$selection = angular.element(selection);
-									$selection.after(_new);
-									$selection.remove();
-									taSelection.setSelectionToElementStart(_new[0]);
-									event.preventDefault();
+								// if we are in the last element of a blockquote, or ul or ol and the element is blank
+								// we need to pull the element outside of the said type
+								var moveOutsideElements = ['blockquote', 'ul', 'ol'];
+								if (contains(moveOutsideElements, selection.parentNode.tagName.toLowerCase())) {
+									if (/^<br(|\/)>$/i.test(selection.innerHTML.trim()) && !selection.nextSibling) {
+										// if last element is blank, pull element outside.
+										$selection = angular.element(selection);
+										var _parent = $selection.parent();
+										_parent.after(_new);
+										$selection.remove();
+										if (_parent.children().length === 0) _parent.remove();
+										taSelection.setSelectionToElementStart(_new[0]);
+										event.preventDefault();
+									}
+									if (/^<[^>]+><br(|\/)><\/[^>]+>$/i.test(selection.innerHTML.trim())) {
+										$selection = angular.element(selection);
+										$selection.after(_new);
+										$selection.remove();
+										taSelection.setSelectionToElementStart(_new[0]);
+										event.preventDefault();
+									}
 								}
 							}
 						}
@@ -2047,10 +2124,8 @@ textAngular.run([function(){
 }]);
 
 textAngular.directive("textAngular", [
-	'$compile', '$timeout', 'taOptions', 'taSelection', 'taExecCommand',
-	'textAngularManager', '$window', '$document', '$animate', '$log', '$q', '$parse',
-	function($compile, $timeout, taOptions, taSelection, taExecCommand,
-		textAngularManager, $window, $document, $animate, $log, $q, $parse){
+	'$compile', '$timeout', 'taOptions', 'taSelection', 'taExecCommand', 'textAngularManager', '$window', '$document', '$animate', '$log', '$q', '$parse',
+	function($compile, $timeout, taOptions, taSelection, taExecCommand, textAngularManager, $window, $document, $animate, $log, $q, $parse){
 		return {
 			require: '?ngModel',
 			scope: {},
@@ -2080,13 +2155,17 @@ textAngular.directive("textAngular", [
 				angular.extend(scope, angular.copy(taOptions), {
 					// wraps the selection in the provided tag / execCommand function. Should only be called in WYSIWYG mode.
 					wrapSelection: function(command, opt, isSelectableElementTool){
+
 						if(command.toLowerCase() === "undo"){
 							scope['$undoTaBindtaTextElement' + _serial]();
-						}else if(command.toLowerCase() === "redo"){
+						}
+						else if(command.toLowerCase() === "redo"){
 							scope['$redoTaBindtaTextElement' + _serial]();
-						}else{
+						}
+						else{
 							// catch errors like FF erroring when you try to force an undo with nothing done
 							_taExecCommand(command, false, opt, scope.defaultTagAttributes);
+
 							if(isSelectableElementTool){
 								// re-apply the selectable tool events
 								scope['reApplyOnSelectorHandlerstaTextElement' + _serial]();
@@ -2254,7 +2333,14 @@ textAngular.directive("textAngular", [
 							event.preventDefault();
 							event.stopPropagation();
 							_body.off('mousemove', mousemove);
-							scope.showPopover(_el);
+							// at this point, we need to force the model to update! since the css has changed!
+							// this fixes bug: #862 - we now hide the popover -- as this seems more consitent.
+							// there are still issues under firefox, the window does not repaint. -- not sure
+							// how best to resolve this, but clicking anywhere works.
+							scope.$apply(function (){
+								scope.hidePopover();
+								scope.updateTaBindtaTextElement();
+							}, 100);
 						});
 						event.stopPropagation();
 						event.preventDefault();
@@ -2487,6 +2573,8 @@ textAngular.directive("textAngular", [
 					var _toolbar = angular.element('<div text-angular-toolbar name="textAngularToolbar' + _serial + '">');
 					// passthrough init of toolbar options
 					if(attrs.taToolbar)						_toolbar.attr('ta-toolbar', attrs.taToolbar);
+					if(attrs.taToolbarIcons)						_toolbar.attr('ta-toolbar-icons', attrs.taToolbarIcons);
+					if(attrs.taToolbarIconType)						_toolbar.attr('ta-toolbar-icon-type', attrs.taToolbarIconType);
 					if(attrs.taToolbarClass)				_toolbar.attr('ta-toolbar-class', attrs.taToolbarClass);
 					if(attrs.taToolbarGroupClass)			_toolbar.attr('ta-toolbar-group-class', attrs.taToolbarGroupClass);
 					if(attrs.taToolbarButtonClass)			_toolbar.attr('ta-toolbar-button-class', attrs.taToolbarButtonClass);
@@ -2521,15 +2609,15 @@ textAngular.directive("textAngular", [
 								$q.when(scope.fileDropHandler(file, scope.wrapSelection) ||
 									(scope.fileDropHandler !== scope.defaultFileDropHandler &&
 									$q.when(scope.defaultFileDropHandler(file, scope.wrapSelection)))).then(function(){
-										scope['updateTaBindtaTextElement' + _serial]();
-									});
+									scope['updateTaBindtaTextElement' + _serial]();
+								});
 							}catch(error){
 								$log.error(error);
 							}
 						});
 						dropEvent.preventDefault();
 						dropEvent.stopPropagation();
-					/* istanbul ignore else, the updates if moved text */
+						/* istanbul ignore else, the updates if moved text */
 					}else{
 						$timeout(function(){
 							scope['updateTaBindtaTextElement' + _serial]();
@@ -2898,12 +2986,15 @@ textAngular.directive('textAngularToolbar', [
 			link: function(scope, element, attrs){
 				if(!scope.name || scope.name === '') throw('textAngular Error: A toolbar requires a name');
 				angular.extend(scope, angular.copy(taOptions));
-				if(attrs.taToolbar)						scope.toolbar = scope.$parent.$eval(attrs.taToolbar);
-				if(attrs.taToolbarClass)				scope.classes.toolbar = attrs.taToolbarClass;
-				if(attrs.taToolbarGroupClass)			scope.classes.toolbarGroup = attrs.taToolbarGroupClass;
-				if(attrs.taToolbarButtonClass)			scope.classes.toolbarButton = attrs.taToolbarButtonClass;
+				if(attrs.taToolbar)										scope.toolbar = scope.$parent.$eval(attrs.taToolbar);
+				if(attrs.taToolbarIcons)							scope.toolbarIcons = scope.$parent.$eval(attrs.taToolbarIcons);
+				if(attrs.taToolbarIconType)						scope.toolbarIconType = attrs.taToolbarIconType;
+				if(attrs.taPastedImages)							scope.pastedImages = attrs.taPastedImages;
+				if(attrs.taToolbarClass)							scope.classes.toolbar = attrs.taToolbarClass;
+				if(attrs.taToolbarGroupClass)					scope.classes.toolbarGroup = attrs.taToolbarGroupClass;
+				if(attrs.taToolbarButtonClass)				scope.classes.toolbarButton = attrs.taToolbarButtonClass;
 				if(attrs.taToolbarActiveButtonClass)	scope.classes.toolbarButtonActive = attrs.taToolbarActiveButtonClass;
-				if(attrs.taFocussedClass)				scope.classes.focussed = attrs.taFocussedClass;
+				if(attrs.taFocussedClass)							scope.classes.focussed = attrs.taFocussedClass;
 
 				scope.disabled = true;
 				scope.focussed = false;
@@ -2916,7 +3007,8 @@ textAngular.directive('textAngularToolbar', [
 					else element.removeClass(scope.classes.focussed);
 				});
 
-				var setupToolElement = function(toolDefinition, toolScope){
+				var setupToolElement = function(toolDefinition, toolScope, groupIndex, toolIndex){
+
 					var toolElement;
 					if(toolDefinition && toolDefinition.display){
 						toolElement = angular.element(toolDefinition.display);
@@ -2942,14 +3034,35 @@ textAngular.directive('textAngularToolbar', [
 						toolElement[0].innerHTML = '';
 						// add the buttonText
 						if(toolDefinition.buttontext) toolElement[0].innerHTML = toolDefinition.buttontext;
-						// add the icon to the front of the button if there is content
-						if(toolDefinition.iconclass){
-							var icon = angular.element('<i>'), content = toolElement[0].innerHTML;
-							icon.addClass(toolDefinition.iconclass);
-							toolElement[0].innerHTML = '';
-							toolElement.append(icon);
-							if(content && content !== '') toolElement.append('&nbsp;' + content);
-						}
+
+            if (scope.toolbarIconType) {
+              switch (scope.toolbarIconType) {
+                case 'svg-sprite':
+                default:
+                  var iconId = scope.toolbarIcons ? scope.toolbarIcons[groupIndex][toolIndex] : 'circle';
+                  var icon = angular.element(
+                    '<svg class="icon ' + iconId + '">' +
+                      '<use xlink:href="#' + iconId + '"/>' +
+                    '</svg>'
+                  );
+									toolElement[0].innerHTML = '';
+									toolElement.append(icon);
+                  break;
+              }
+            }
+            else {
+              // add the icon to the front of the button if there is content
+              if(toolDefinition.iconclass){
+                var icon = angular.element('<i>'),
+                    content = toolElement[0].innerHTML;
+                icon.addClass(toolDefinition.iconclass);
+                toolElement[0].innerHTML = '';
+                toolElement.append(icon);
+                if(content && content !== '') toolElement.append('&nbsp;' + content);
+              }
+            }
+
+
 					}
 
 					toolScope._lastToolDefinition = angular.copy(toolDefinition);
@@ -2978,11 +3091,11 @@ textAngular.directive('textAngularToolbar', [
 						return ( // this bracket is important as without it it just returns the first bracket and ignores the rest
 							// when the button's disabled function/value evaluates to true
 							(typeof this.$eval('disabled') !== 'function' && this.$eval('disabled')) || this.$eval('disabled()') ||
-							// all buttons except the HTML Switch button should be disabled in the showHtml (RAW html) mode
+								// all buttons except the HTML Switch button should be disabled in the showHtml (RAW html) mode
 							(this.name !== 'html' && this.$editor().showHtml) ||
-							// if the toolbar is disabled
+								// if the toolbar is disabled
 							this.$parent.disabled ||
-							// if the current editor is disabled
+								// if the current editor is disabled
 							this.$editor().disabled
 						);
 					},
@@ -2992,17 +3105,17 @@ textAngular.directive('textAngularToolbar', [
 					executeAction: taToolExecuteAction
 				};
 
-				angular.forEach(scope.toolbar, function(group){
+				angular.forEach(scope.toolbar, function(group, groupIndex){
 					// setup the toolbar group
 					var groupElement = angular.element("<div>");
 					groupElement.addClass(scope.classes.toolbarGroup);
-					angular.forEach(group, function(tool){
+					angular.forEach(group, function(tool, toolIndex){
 						// init and add the tools to the group
 						// a tool name (key name from taTools struct)
 						//creates a child scope of the main angularText scope and then extends the childScope with the functions of this particular tool
 						// reference to the scope and element kept
 						scope.tools[tool] = angular.extend(scope.$new(true), taTools[tool], defaultChildScope, {name: tool});
-						scope.tools[tool].$element = setupToolElement(taTools[tool], scope.tools[tool]);
+						scope.tools[tool].$element = setupToolElement(taTools[tool], scope.tools[tool], groupIndex, toolIndex);
 						// append the tool compiled with the childScope to the group element
 						groupElement.append(scope.tools[tool].$element);
 					});

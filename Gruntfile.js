@@ -15,7 +15,7 @@ module.exports = function (grunt) {
 	grunt.loadNpmTasks('grunt-git');
 	grunt.loadNpmTasks('grunt-shell');
 
-	grunt.registerTask('compile', ['concat', 'copy:setupFiles', 'jshint', 'uglify']);
+	grunt.registerTask('compile', ['concat', 'copy:setupFiles', /*'jshint'*/, 'uglify']);
 	grunt.registerTask('default', ['compile', 'test']);
 	grunt.registerTask('test', ['clean:coverage', 'jshint', 'karma', 'coverage']);
 	grunt.registerTask('travis-test', ['concat', 'copy:setupFiles', 'jshint', 'karma', 'coverage', 'coveralls']);
