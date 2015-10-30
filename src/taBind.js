@@ -491,6 +491,7 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 					// all the code specific to contenteditable divs
 					var _processingPaste = false;
 					/* istanbul ignore next: phantom js cannot test this for some reason */
+
 					var processpaste = function(text) {
 						/* istanbul ignore else: don't care if nothing pasted */
 						if(text && text.trim().length){
@@ -587,7 +588,8 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 								});
 								angular.forEach(targetDom.find('font'), _unwrapElement);
 								text = targetDom.html();
-							}else{
+							}
+							else{
 								// remove unnecessary chrome insert
 								text = text.replace(/<(|\/)meta[^>]*?>/ig, '');
 								if(text.match(/<[^>]*?(ta-bind)[^>]*?>/)){
@@ -605,7 +607,8 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 										}
 										text = _el.html().replace('<br class="Apple-interchange-newline">', '');
 									}
-								}else if(text.match(/^<span/)){
+								}
+								else if(text.match(/^<span/)){
 									// in case of pasting only a span - chrome paste, remove them. THis is just some wierd formatting
 									// if we remove the '<span class="Apple-converted-space"> </span>' here we destroy the spacing
 									// on paste from even ourselves!
@@ -634,7 +637,8 @@ angular.module('textAngular.taBind', ['textAngular.factories', 'textAngular.DOM'
 							if(_pasteHandler) text = _pasteHandler(scope, {$html: text}) || text;
 
 							text = taSanitize(text, '', _disableSanitizer);
-							var result = taSelection.insertHtml(text, element[0]);
+
+							var result = taSelection.insertHtml(text, element);
 
 							scope.$emit('pastedImages', result.imageUrls);
 

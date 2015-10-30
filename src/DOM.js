@@ -330,22 +330,18 @@ angular.module('textAngular.DOM', ['textAngular.factories'])
 			},
 			// from http://stackoverflow.com/questions/6690752/insert-html-at-caret-in-a-contenteditable-div
 			// topNode is the contenteditable normally, all manipulation MUST be inside this.
-			insertHtml: function(html, topNode){
+			insertHtml: function(html, $topNode){
 
-				html = $sanitize(html);
+        var result = this.sanatizeHtml(html);
 
-				var match;
-				var imageUrls = [];
-				var re = /<img.*?src="(.*?)"[^>]+\>/gi;
-				while (match = re.exec(html)) {
-					imageUrls.push(match[1]);
-				}
+				$topNode.html(result.newText);
 
-				html = html.replace(/<img[^>]+\>/gi, '');
-				html = html.replace(/<input[^>]+\>/gi, '');
+				return {
+					imageUrls: result.imageUrls
+				};
 
-				html = html.replace(/(style|id|class)=".*?"/gi, '');
 
+				/*
 				var parent, secondParent, _childI, nodes, i, lastNode, _tempFrag;
 				var element = angular.element("<div>" + html + "</div>");
 				var range = rangy.getSelection().getRangeAt(0);
@@ -492,7 +488,63 @@ angular.module('textAngular.DOM', ['textAngular.factories'])
 				return {
 					imageUrls: imageUrls
 				}
-			}
+				*/
+			},
+      sanatizeHtml: function(html) {
+
+        var newText = '';
+        var match;
+        var imageUrls;
+
+        if (html) {
+					imageUrls = [];
+					var re = /<img.*?src="(.*?)"[^>]+\>/gi;
+					while (match = re.exec(html)) {
+						imageUrls.push(match[1]);
+					}
+
+					html = html.replace(/<img[^>]+\>/gi, '');
+					html = html.replace(/<input[^>]+\>/gi, '');
+
+					html = html.replace(/(style|id|class)=".*?"/gi, '');
+        }
+
+				html = $sanitize(html);
+
+        if (html) {
+					var $element;
+
+					try {
+						$element = $(html);
+					}
+					catch(error) {
+						$element = $('<div/>').html(html);
+					}
+
+          var $children = $element.children();
+
+          if ($children.length > 0) {
+
+            $children.each(function() {
+
+              var text = $(this).text();
+              if (text) {
+                newText += $.trim($(this).text()) + '<br>';
+              }
+
+            });
+
+          }
+          else if ('' !== $element.text()) {
+            newText = $.trim($element.text()) + '<br>';
+          }
+        }
+
+        return {
+          newText: newText,
+          imageUrls: imageUrls
+        }
+      }
 		};
 		return api;
 	}]
@@ -511,35 +563,35 @@ angular.module('textAngular.DOM', ['textAngular.factories'])
 			if(element.attr(attribute) !== undefined) resultingElements.push(element);
 			return resultingElements;
 		},
-		
+
 		transferChildNodes: function(source, target){
 			// clear out target
 			target.innerHTML = '';
 			while(source.childNodes.length > 0) target.appendChild(source.childNodes[0]);
 			return target;
 		},
-		
+
 		splitNodes: function(nodes, target1, target2, splitNode, subSplitIndex, splitIndex){
 			if(!splitNode && isNaN(splitIndex)) throw new Error('taDOM.splitNodes requires a splitNode or splitIndex');
 			var startNodes = document.createDocumentFragment();
 			var endNodes = document.createDocumentFragment();
 			var index = 0;
-			
+
 			while(nodes.length > 0 && (isNaN(splitIndex) || splitIndex !== index) && nodes[0] !== splitNode){
 				startNodes.appendChild(nodes[0]); // this removes from the nodes array (if proper childNodes object.
 				index++;
 			}
-			
+
 			if(!isNaN(subSplitIndex) && subSplitIndex >= 0 && nodes[0]){
 				startNodes.appendChild(document.createTextNode(nodes[0].nodeValue.substring(0, subSplitIndex)));
 				nodes[0].nodeValue = nodes[0].nodeValue.substring(subSplitIndex);
 			}
 			while(nodes.length > 0) endNodes.appendChild(nodes[0]);
-			
+
 			taDOM.transferChildNodes(startNodes, target1);
 			taDOM.transferChildNodes(endNodes, target2);
 		},
-		
+
 		transferNodeAttributes: function(source, target){
 			for(var i = 0; i < source.attributes.length; i++) target.setAttribute(source.attributes[i].name, source.attributes[i].value);
 			return target;
